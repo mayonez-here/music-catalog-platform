@@ -3,6 +3,13 @@
 A full-stack app for building a personal album library from the public iTunes
 catalog, then exploring it through analytics and AI-generated insights.
 
+**🔗 Live demo:** https://music-catalog-platform-seven.vercel.app
+**🔗 Backend API:** https://music-catalog-platform-qogh.onrender.com
+
+> Backend runs on Render's free tier, which spins down after inactivity —
+> the first request after a period of idle time can take 30–50s to wake up.
+> Subsequent requests are fast.
+
 - **Backend:** Java 17 / Spring Boot 3, PostgreSQL, JWT auth
 - **Frontend:** Next.js 14 (App Router) / TypeScript / Tailwind
 - **Third-party API:** [iTunes Search API](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/) (no key required)
@@ -115,6 +122,12 @@ returns `404`; duplicates return `409`; upstream iTunes failures return `502` �
 all via a single `@RestControllerAdvice` (`GlobalExceptionHandler`), so error
 shape is consistent everywhere.
 
+**A quirk worth knowing about:** the iTunes Search API serves its JSON with
+`Content-Type: text/javascript` — a leftover from its JSONP-era design.
+Spring's `WebClient` won't auto-decode a body it doesn't recognize as JSON, so
+`ItunesService` fetches the raw response as a `String` and parses it manually
+with Jackson instead of relying on WebClient's content-type negotiation.
+
 ## 5. Running it locally
 
 **Backend + Postgres (Docker):**
@@ -145,25 +158,45 @@ npm run dev
 
 ## 6. Deployment
 
-**Frontend → Vercel**
-1. Push this repo to GitHub.
-2. Import it in Vercel, set the project root to `frontend/`.
-3. Add an environment variable `NEXT_PUBLIC_API_BASE_URL` pointing at your
-   deployed backend URL (see below).
-4. Deploy. Vercel builds Next.js natively — no config needed beyond that env var.
+This project is deployed as two separate services (see live links at the top).
+Steps below are what was actually used, including two gotchas worth flagging
+for anyone redeploying this.
 
-**Backend → Render / Railway** (Vercel doesn't run long-lived JVM services, so
-the backend needs a separate host)
-1. Create a new Web Service from the same repo, root `backend/`.
-2. It auto-detects the `Dockerfile`, or you can build with
-   `mvn clean package` / run `java -jar target/*.jar`.
-3. Add a managed Postgres instance (both platforms offer one) and set:
-   - `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`
-   - `JWT_SECRET` (any long random string)
-   - `ALLOWED_ORIGINS` = your Vercel frontend URL
-   - `ANTHROPIC_API_KEY` (optional, enables LLM-narrated insights)
-4. Redeploy the frontend (or just update its env var) once you have the
-   backend's live URL.
+**Backend → Render**
+1. New Web Service → connect the GitHub repo → **Root Directory:** `backend`
+   → **Language:** Docker (auto-detects the `Dockerfile`) → Free instance.
+2. New → PostgreSQL (same region as the web service, for the private network).
+3. On the web service's **Environment** tab, set:
+   - `DATABASE_URL` — **must be JDBC-formatted**, e.g.
+     `jdbc:postgresql://<host>:5432/<dbname>`. Render's own "Internal Database
+     URL" is in `postgres://user:pass@host/db` form and will *not* work as-is —
+     strip it down to just the JDBC scheme + host + port + db name.
+   - `DATABASE_USERNAME`, `DATABASE_PASSWORD` — from the Postgres instance.
+   - `JWT_SECRET` — any long random string (32+ chars).
+   - `ALLOWED_ORIGINS` — your frontend's exact production URL, **no trailing
+     slash**. A mismatch here (trailing slash, `http` vs `https`, stray
+     whitespace) fails silently as a CORS preflight `403` in the browser with
+     no server-side error to point at, so it's worth typing this one by hand
+     rather than pasting.
+   - `ANTHROPIC_API_KEY` (optional, enables LLM-narrated insights).
+4. Deploy. Check the **Logs** tab for `Your service is live 🎉` and confirm
+   `HikariPool-1 - Start completed` appears (that's the DB connection
+   succeeding).
+
+**Frontend → Vercel**
+1. Add New Project → same repo → **Root Directory:** `frontend`.
+2. Environment variable: `NEXT_PUBLIC_API_BASE_URL` = your Render backend URL
+   (no trailing slash).
+3. Deploy.
+4. Go back to Render and set `ALLOWED_ORIGINS` to this Vercel URL (step 3
+   above) — the two services need each other's URLs, so backend goes first,
+   frontend second, then backend's CORS config gets updated last.
+
+**Sanity check after deploying:** visiting the bare backend URL in a browser
+will correctly show a `403` — there's no root route, and Spring Security
+rejects unauthenticated requests to everything except `/api/auth/**`. That's
+expected, not a bug; the real test is registering through the deployed
+frontend.
 
 ## 7. Trade-offs & what I'd do with more time
 
