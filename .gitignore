@@ -1,0 +1,22 @@
+# Node / frontend
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/.env
+frontend/.env.local
+npm-debug.log*
+
+# Java / backend
+backend/target
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# OS
+.DS_Store

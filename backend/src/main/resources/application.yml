@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: music-catalog-platform
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/music_catalog}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: always
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:this-is-a-dev-only-secret-please-override-in-production-env-var-1234567890}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24h
+
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
+
+  itunes:
+    base-url: ${ITUNES_BASE_URL:https://itunes.apple.com}
+
+  # Optional: if set, the /api/insights endpoint asks Claude to phrase the trend
+  # summary in natural language. If left blank, a deterministic template is used
+  # instead - the feature works fully either way. Never required for deployment.
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+
+logging:
+  level:
+    com.musiccatalog: INFO

@@ -1,0 +1,41 @@
+# Local development only. Spins up Postgres + the backend so you can run the
+# whole stack without installing Postgres yourself. Run the frontend separately
+# with `npm run dev` inside frontend/ (see README).
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: music_catalog
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/music_catalog
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      JWT_SECRET: local-dev-secret-change-me-please-1234567890
+      ALLOWED_ORIGINS: http://localhost:3000
+      # ANTHROPIC_API_KEY: sk-ant-...   # optional, enables LLM-narrated insights
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
